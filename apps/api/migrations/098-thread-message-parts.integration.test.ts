@@ -72,7 +72,7 @@ describe("migration 098 thread_message_parts", () => {
     // `${runId}:${messageId}:${seq}` and `seq` is per-MESSAGE (restarts at 0 per
     // message), so two messages in one run legitimately share (run_id, seq) —
     // e.g. the user message (persisted at dispatch) and the assistant message
-    // (persisted during projection). Row uniqueness is guaranteed by the `id` primary
+    // (persisted at relay). Row uniqueness is guaranteed by the `id` primary
     // key instead.
     const now = new Date().toISOString();
     const threadId = "thr_test_098";
