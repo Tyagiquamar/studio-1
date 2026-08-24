@@ -121,6 +121,22 @@ describe("daemon e2e: dispatch", () => {
     );
   });
 
+  it("POST /dispatch with another harness → 400 unknown_harness", async () => {
+    const res = await fetch(url(d, "/_sandbox/dispatch"), {
+      method: "POST",
+      headers: jsonAuthHeaders(),
+      body: toBody({
+        harnessId: "codex",
+        runId: "run-other-harness",
+        input: VALID_INPUT,
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe(
+      "unknown_harness",
+    );
+  });
+
   it("POST /dispatch without runId → 400 missing_run_id", async () => {
     const res = await fetch(url(d, "/_sandbox/dispatch"), {
       method: "POST",
@@ -269,13 +285,12 @@ describe("daemon e2e: dispatch runs a harness", () => {
       const echoed = JSON.parse(
         (body.chunks[0] as { delta: string }).delta,
       ) as Record<string, unknown>;
-      expect(echoed.harnessId).toBe("claude-code");
       expect(echoed.threadId).toBe("thrd_e2e");
       // `/repo` is rebased onto the pod's app root before the harness sees it.
       expect(echoed.cwd).toMatch(/\/repo$/);
       expect(echoed.cwd).not.toBe("/repo");
       // The model credential reaches the harness as its spawn env.
-      expect(echoed.apiKey).toBe("sk-e2e");
+      expect(echoed.hasExpectedApiKey).toBe(true);
     },
     HOOK_TIMEOUT_MS,
   );

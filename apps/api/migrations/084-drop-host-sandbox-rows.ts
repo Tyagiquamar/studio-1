@@ -2,11 +2,9 @@
  * Migration 079: Drop sandbox_runner_state rows for the retired `host`
  * runner.
  *
- * The `host` SandboxProvider was the local-dev shortcut that spawned the
- * sandbox daemon as a child of the studio process. It has been retired in
- * favor of the laptop-side `deco link` daemon (auto-spawned by
- * `bun run dev --local-sandbox-provider`), which exercises the same
- * remote-cli + desktop code paths production uses.
+ * The `host` sandbox implementation was the local-dev shortcut that spawned the
+ * sandbox daemon as a child of the Studio process. It was retired, so its
+ * persisted process pointers could no longer be resumed.
  *
  * Any `runner_kind = 'host'` rows left in dev databases are orphaned
  * pointers to daemon PIDs/ports that no longer exist; the new code path

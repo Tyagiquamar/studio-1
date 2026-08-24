@@ -1,16 +1,16 @@
 /**
- * SandboxDispatchClient — the `SandboxClient` for harnesses that run INSIDE the
- * sandbox instead of in this process.
+ * Dispatches harnesses that run inside the hosted sandbox instead of in the
+ * Studio process.
  *
- * Decopilot runs in-process (`InProcessSandboxClient`); the Claude Agent SDK
- * cannot — it is a TS library that drives the `claude` CLI, and it belongs next
+ * Decopilot runs in-process; the Claude Agent SDK cannot — it is a TS library
+ * that drives the `claude` CLI, and it belongs next
  * to the checkout. So this client provisions the pod, POSTs the same
  * `HarnessStreamInputWire` to the daemon's `/_sandbox/dispatch`, and yields the
  * turn it answers with as the `UIMessageChunk` iterable every consumer upstream
  * already expects. Nothing downstream of `dispatch()` can tell the difference.
  *
- * STUDIO-OWNED, like its in-process sibling: it closes over StudioContext, so
- * it cannot live in `@decocms/sandbox`.
+ * STUDIO-OWNED: it closes over StudioContext, so it cannot live in
+ * `@decocms/sandbox`.
  *
  * Transport note: one request per run, held open for its whole length, with the
  * daemon streaming newline-delimited `HarnessRunResult` frames as the harness
@@ -31,7 +31,6 @@
 
 import type { UIMessageChunk } from "ai";
 import { sleep } from "@decocms/shared/std";
-import type { SandboxClient } from "@decocms/sandbox/dispatch/sandbox-client";
 import {
   harnessRunResultSchema,
   type HarnessStreamInputWire,
@@ -40,12 +39,10 @@ import {
   SANDBOX_GONE_TERMINAL_CODE,
   SANDBOX_UNREACHABLE_PREFIX,
 } from "@decocms/sandbox/dispatch/error-codes";
-import type {
-  PodTermination,
-  SandboxProvider,
-} from "@decocms/sandbox/provider";
+import type { PodTermination } from "@decocms/sandbox/provider";
+import type { AgentSandboxProvider } from "@decocms/sandbox/provider/agent-sandbox";
 import { isTransientStreamError } from "@/harnesses/decopilot/built-in-tools/subtask";
-import type { HarnessId, HarnessStreamInput } from "@/harnesses/lib/types";
+import type { HarnessStreamInput } from "@/harnesses/lib/types";
 import {
   claudeCodeEnvFromCredential,
   modelClassFromMetadata,
@@ -69,7 +66,7 @@ import type { Permission } from "@/storage/types";
 import { connectionGrantsFor, rolesOf } from "@/harnesses/org-mcp-grants";
 import { REVIEW_RUN_TOOL_NAMES } from "@/tools/task-board/task-run-context";
 import { getPublicUrl } from "@/core/server-constants";
-import { resolveSandboxProvider } from "@/sandbox/resolve-provider";
+import { getAgentSandboxProvider } from "@/sandbox/lifecycle";
 import { getSettings } from "@/settings";
 import { ensureSandbox } from "@/tools/sandbox/start";
 import {
@@ -89,8 +86,8 @@ import {
  */
 const SANDBOX_REPO_CWD = "/repo";
 
-/** Harnesses this client can dispatch. Decopilot is in-process, never here. */
-const SANDBOX_HOSTED_HARNESSES = new Set<HarnessId>(["claude-code"]);
+/** The one harness this client dispatches. Decopilot runs in-process. */
+const SANDBOX_HOSTED_HARNESS = "claude-code";
 
 /**
  * Dispatches per run WITHOUT PROGRESS: the first, plus ONE continuation after
@@ -207,20 +204,14 @@ export function isUnreachableStatus(status: number): boolean {
   return status === 404 || status === 410 || status >= 500;
 }
 
-/**
- * Widened past `HarnessId` so callers holding a raw `threads.harness_id` can ask
- * without an `as`-cast — a cast there would hide a renamed harness until
- * runtime. A Set lookup is total over strings, so nothing is lost.
- */
 export function harnessRunsInSandbox(
   harnessId: string | null | undefined,
 ): boolean {
-  return SANDBOX_HOSTED_HARNESSES.has(harnessId as HarnessId);
+  return harnessId === SANDBOX_HOSTED_HARNESS;
 }
 
-export class SandboxDispatchClient implements SandboxClient {
+export class SandboxDispatchClient {
   private readonly ctx: StudioContext;
-  private readonly harnessId: HarnessId;
   private readonly virtualMcpId: string;
   private readonly branch: string;
   private readonly credential: ClaudeCodeCredential | null;
@@ -228,7 +219,6 @@ export class SandboxDispatchClient implements SandboxClient {
 
   constructor(args: {
     ctx: StudioContext;
-    harnessId: HarnessId;
     virtualMcpId: string;
     branch: string;
     /** Resolved thinking-slot credential; becomes the sandbox's model env. */
@@ -241,13 +231,7 @@ export class SandboxDispatchClient implements SandboxClient {
      */
     resume?: { reason: string };
   }) {
-    if (!harnessRunsInSandbox(args.harnessId)) {
-      throw new Error(
-        `SandboxDispatchClient runs sandbox-hosted harnesses only; got "${args.harnessId}"`,
-      );
-    }
     this.ctx = args.ctx;
-    this.harnessId = args.harnessId;
     this.virtualMcpId = args.virtualMcpId;
     this.branch = args.branch;
     this.credential = args.credential;
@@ -336,7 +320,7 @@ export class SandboxDispatchClient implements SandboxClient {
       this.ctx,
       this.virtualMcpId,
       organization,
-      `${this.harnessId}-run`,
+      `${SANDBOX_HOSTED_HARNESS}-run`,
       "task-run",
       threadId,
       // Exactly what this run mounts, never a wildcard: the tools its own
@@ -358,7 +342,7 @@ export class SandboxDispatchClient implements SandboxClient {
       connections,
     });
     console.log(
-      `[${this.harnessId}] org mcps: ${
+      `[${SANDBOX_HOSTED_HARNESS}] org mcps: ${
         orgMcps.map((server) => server.name).join(" ") || "none"
       }${
         candidates.length === connections.length
@@ -438,7 +422,7 @@ export class SandboxDispatchClient implements SandboxClient {
   ): AsyncIterable<UIMessageChunk> {
     if (!this.credential) {
       throw new Error(
-        `the ${this.harnessId} harness needs a resolved model credential; ` +
+        `the ${SANDBOX_HOSTED_HARNESS} harness needs a resolved model credential; ` +
           `this run has none (check the agent's thinking model)`,
       );
     }
@@ -453,7 +437,7 @@ export class SandboxDispatchClient implements SandboxClient {
     const organization = this.ctx.organization;
     if (!organization) {
       throw new Error(
-        `the ${this.harnessId} harness needs an organization on the context ` +
+        `the ${SANDBOX_HOSTED_HARNESS} harness needs an organization on the context ` +
           `to mint its MCP endpoint; this run has none`,
       );
     }
@@ -461,11 +445,7 @@ export class SandboxDispatchClient implements SandboxClient {
     // Resolved before the pod exists; model credential wins — see `mergeRunEnv`.
     const runEnv = mergeRunEnv(await resolveOrgRunEnv(this.ctx), modelEnv);
 
-    const { provider, kind } = await resolveSandboxProvider(this.ctx, {
-      userId: input.user.id,
-      branch: this.branch,
-      virtualMcpMetadata: null,
-    });
+    const provider = await getAgentSandboxProvider(this.ctx);
     const wireInput = {
       ...input,
       // Hosted Decopilot's in-process client ignores `mcp` and gets the
@@ -499,7 +479,7 @@ export class SandboxDispatchClient implements SandboxClient {
     // rather than a second agent in the same checkout (see the daemon's
     // `Registry.claim`).
     const runId = input.threadId;
-    const { ctx, harnessId, virtualMcpId, branch } = this;
+    const { ctx, virtualMcpId, branch } = this;
     const credentialProviderId = this.credential.providerId;
 
     // Provisioning is re-done per attempt on purpose. On the continuation path
@@ -520,7 +500,6 @@ export class SandboxDispatchClient implements SandboxClient {
           {
             virtualMcpId,
             branch,
-            sandboxProviderKind: kind,
             // One agent loop, no preview, and a memory ceiling of its own.
             purpose: "harness-run",
           },
@@ -534,7 +513,6 @@ export class SandboxDispatchClient implements SandboxClient {
           dispatchToDaemon({
             provider,
             handle: sandbox.sandboxHandle,
-            harnessId,
             input: resume ? { ...wireInput, resume } : wireInput,
             runId,
             signal: input.signal,
@@ -555,9 +533,7 @@ export class SandboxDispatchClient implements SandboxClient {
         describeTermination: async (handle) =>
           handle === null
             ? null
-            : describeTermination(
-                (await provider.lastTermination?.(handle)) ?? null,
-              ),
+            : describeTermination(await provider.lastTermination(handle)),
       });
     } finally {
       // The run is over — cleanly, failed, or aborted. This pod is `cloneOnly`:
@@ -571,7 +547,7 @@ export class SandboxDispatchClient implements SandboxClient {
       // short a sandbox another turn just extended.
       if (lastHandle && getSettings().sandboxReleaseOnRunEndEnabled) {
         await provider
-          .releaseAfter?.(lastHandle, getSettings().sandboxReleaseGraceMs)
+          .releaseAfter(lastHandle, getSettings().sandboxReleaseGraceMs)
           .catch(() => {});
       }
     }
@@ -737,7 +713,7 @@ const PUSH_ENV_TIMEOUT_MS = 30_000;
  * the request body in an error message.
  */
 export async function pushSandboxEnv(
-  provider: SandboxProvider,
+  provider: Pick<AgentSandboxProvider, "proxyDaemonRequest">,
   handle: string,
   env: Record<string, string | null>,
 ): Promise<void> {
@@ -789,13 +765,12 @@ const TTL_RENEW_MS = 5 * 60_000;
  * protecting.
  */
 function renewWhileStreaming(
-  provider: SandboxProvider,
+  provider: Pick<AgentSandboxProvider, "renewTtl">,
   handle: string,
 ): () => void {
-  if (!provider.renewTtl) return () => {};
   const renew = () =>
     void provider
-      .renewTtl?.(handle)
+      .renewTtl(handle)
       .catch((err) =>
         console.warn(
           `[sandbox-dispatch] TTL renew failed for ${handle}: ${err instanceof Error ? err.message : String(err)}`,
@@ -811,9 +786,8 @@ function renewWhileStreaming(
 }
 
 async function* dispatchToDaemon(args: {
-  provider: SandboxProvider;
+  provider: Pick<AgentSandboxProvider, "proxyDaemonRequest" | "renewTtl">;
   handle: string;
-  harnessId: HarnessId;
   runId: string;
   input: HarnessStreamInput;
   signal?: AbortSignal;
@@ -831,7 +805,7 @@ async function* dispatchToDaemon(args: {
         method: "POST",
         headers: new Headers({ "content-type": "application/json" }),
         body: JSON.stringify({
-          harnessId: args.harnessId,
+          harnessId: SANDBOX_HOSTED_HARNESS,
           runId: args.runId,
           input: toWireInput(args.input),
         }),
@@ -1000,9 +974,8 @@ export async function* ndjsonLines(
         .then(() => "silent" as const)
         .catch(() => "read-won" as const);
       const step = await Promise.race([next, timeout]).catch((err: unknown) => {
-        // The body's socket broke mid-run. This is the port-forward
-        // WebSocket to the pod (`AgentSandboxRunner.openForwarder`), and the
-        // API server hanging it up is not the harness failing — the checkout
+        // The body's socket broke mid-run. The API server hanging up its
+        // port-forward to the pod is not the harness failing — the checkout
         // is intact and the turn is continuable, exactly like the silence
         // timeout below. Without this the read rejection travels as a plain
         // Error, `dispatchWithContinuation` refuses to retry it, and a

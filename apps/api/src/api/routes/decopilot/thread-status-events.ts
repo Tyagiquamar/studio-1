@@ -21,7 +21,7 @@ export interface TerminalThreadStatusRow {
  * Emit the org-wide `decopilot.thread.status` SSE event for a terminal run
  * transition performed by the durable projector.
  *
- * user-desktop runs finalize via the projector (`completeRunIfNotCompleted` /
+ * local-api runs finalize via the projector (`completeRunIfNotCompleted` /
  * `markRunFailed`), NOT via the in-memory run-reactor that hosted runs use — so
  * without this emit the sidebar status chip never receives a real-time
  * completed/failed push and stays "running" until the next refetch (a manual

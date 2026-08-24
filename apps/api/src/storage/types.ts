@@ -952,7 +952,7 @@ export interface ThreadTable {
   virtual_mcp_id: string;
   /** Git branch this thread is pinned to (GitHub-linked virtualmcps only) */
   branch: string | null;
-  /** Sandbox provider kind pinned on first message (e.g. "agent-sandbox", "user-desktop") */
+  /** Dormant legacy column retained in the physical schema; runtime code ignores it. */
   sandbox_provider_kind: string | null;
   /** Harness id pinned on first message (e.g. "claude-code", "codex", "decopilot") */
   harness_id: string | null;
@@ -970,15 +970,6 @@ export interface ThreadTable {
   >;
   /** Single-writer fence for the active run; null when none minted (Phase A). */
   run_fence_token: ColumnType<string | null, string | null, string | null>;
-  /**
-   * @deprecated Per-thread transport selector. No longer read for routing —
-   * the thread gate uses the active link publisher whenever NATS and the link
-   * dispatch runtime are available (see thread-gate-workflow.ts). The writer
-   * (`setLinkTransport`) was removed with the cluster reverse-WS cleanup.
-   * Column retained (nullable) for backward compatibility; no drop migration.
-   * New code MUST NOT read or write it.
-   */
-  link_transport: ColumnType<string | null, string | null, string | null>;
   /**
    * Durable cancel flag (Phase C). Set by the cancel endpoint; the ingest
    * backstop rejects with 409 when non-null, regardless of fence state.
@@ -1039,8 +1030,6 @@ export interface Thread {
   virtual_mcp_id: string;
   /** Git branch this thread is pinned to (GitHub-linked virtualmcps only) */
   branch: string | null;
-  /** Sandbox provider kind pinned on first message (e.g. "agent-sandbox", "user-desktop") */
-  sandbox_provider_kind: string | null;
   /** Harness id pinned on first message (e.g. "claude-code", "codex", "decopilot") */
   harness_id: string | null;
   metadata: ThreadMetadata;
@@ -1051,12 +1040,6 @@ export interface Thread {
    * Pinned on the thread row; read path forks on this value.
    */
   message_storage_version: number;
-  /**
-   * @deprecated No longer used for routing (see the `threads` table column
-   * doc). Surfaced on the read path for backward compatibility only; nothing
-   * writes it. New code MUST NOT depend on it.
-   */
-  link_transport: string | null;
 }
 
 /**

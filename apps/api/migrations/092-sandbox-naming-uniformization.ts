@@ -8,9 +8,6 @@
  *  (1) `sandbox_runner_state.sandbox_provider_kind` value rewrite:
  *        docker        → local-docker
  *        agent-sandbox → cluster
- *        desktop       → user-desktop
- *        remote-user   → user-desktop  (legacy from migration 089's
- *                                       intermediate `desktop` value)
  *
  *  (2) `connections.metadata.vmMap` top-level key → `sandboxMap`.
  *      The 3-level shape established by migration 087 is preserved; only
@@ -31,10 +28,7 @@
  *      structured fields all encode as quoted strings, so this captures
  *      them all while keeping documentation text intact.
  *
- * All four passes are idempotent. studio-sdk's tolerant readers
- * (`parseBranchMap` / `parseSandboxRecord`) continue to accept the legacy
- * shapes during the rolling deploy window; the follow-up task removes them
- * once this migration has run everywhere.
+ * All four passes are idempotent.
  */
 
 import { sql, type Kysely } from "kysely";
@@ -48,11 +42,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     SET sandbox_provider_kind = CASE sandbox_provider_kind
       WHEN 'docker'        THEN 'local-docker'
       WHEN 'agent-sandbox' THEN 'cluster'
-      WHEN 'desktop'       THEN 'user-desktop'
-      WHEN 'remote-user'   THEN 'user-desktop'
       ELSE sandbox_provider_kind
     END
-    WHERE sandbox_provider_kind IN ('docker','agent-sandbox','desktop','remote-user')
+    WHERE sandbox_provider_kind IN ('docker','agent-sandbox')
   `.execute(db);
 
   // (2) Rename top-level `vmMap` → `sandboxMap` on connections.metadata.
@@ -74,11 +66,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   //
   // Single combined pass: the CASE on `kind_key` produces the new key, and
   // the CASE on the entry produces the new body with sandboxProviderKind
-  // updated if it carried a legacy value. If two legacy keys map to the
-  // same canonical key (e.g. `desktop` + `remote-user` → `user-desktop`)
-  // jsonb_object_agg keeps the last one — acceptable because both should
-  // describe the same live sandbox in practice, and we re-set the field to
-  // the canonical value either way.
+  // updated if it carried a legacy value.
   await sql`
     UPDATE connections c
     SET metadata = (
@@ -98,8 +86,6 @@ export async function up(db: Kysely<unknown>): Promise<void> {
                         CASE kind_key
                           WHEN 'docker'        THEN 'local-docker'
                           WHEN 'agent-sandbox' THEN 'cluster'
-                          WHEN 'desktop'       THEN 'user-desktop'
-                          WHEN 'remote-user'   THEN 'user-desktop'
                           ELSE kind_key
                         END,
                         CASE inner_entry->>'sandboxProviderKind'
@@ -107,10 +93,6 @@ export async function up(db: Kysely<unknown>): Promise<void> {
                             THEN jsonb_set(inner_entry, '{sandboxProviderKind}', '"local-docker"'::jsonb)
                           WHEN 'agent-sandbox'
                             THEN jsonb_set(inner_entry, '{sandboxProviderKind}', '"cluster"'::jsonb)
-                          WHEN 'desktop'
-                            THEN jsonb_set(inner_entry, '{sandboxProviderKind}', '"user-desktop"'::jsonb)
-                          WHEN 'remote-user'
-                            THEN jsonb_set(inner_entry, '{sandboxProviderKind}', '"user-desktop"'::jsonb)
                           ELSE inner_entry
                         END
                       )
@@ -137,8 +119,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
         FROM jsonb_each(c.metadata::jsonb -> 'sandboxMap') AS users(user_key, user_map)
         JOIN jsonb_each(user_map) AS branches(branch_key, branch_entry) ON true
         JOIN jsonb_each(branch_entry) AS kinds(kind_key, inner_entry) ON true
-        WHERE kind_key IN ('docker','agent-sandbox','desktop','remote-user','host','freestyle')
-           OR inner_entry->>'sandboxProviderKind' IN ('docker','agent-sandbox','desktop','remote-user')
+        WHERE kind_key IN ('docker','agent-sandbox','host','freestyle')
+           OR inner_entry->>'sandboxProviderKind' IN ('docker','agent-sandbox')
       );
   `.execute(db);
 

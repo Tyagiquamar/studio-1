@@ -4,7 +4,7 @@
  *
  * Covers both rewrites:
  *  1. `sandbox_runner_state` rows with sandbox_provider_kind = 'local-docker'
- *     are deleted; canonical (`cluster`, `user-desktop`) rows are preserved.
+ *     are deleted; other provider rows are preserved.
  *  2. The `local-docker` cell is removed from every
  *     `connections.metadata.sandboxMap[user][branch]`; sibling cells are
  *     preserved and branch/user buckets that become empty are dropped.
@@ -106,14 +106,14 @@ describe("migration 097 — drop local-docker sandbox state", () => {
   it("deletes local-docker runner-state rows and keeps canonical ones", async () => {
     await insertRunnerState(database, "h-local-docker", "local-docker");
     await insertRunnerState(database, "h-cluster", "cluster");
-    await insertRunnerState(database, "h-user-desktop", "user-desktop");
+    await insertRunnerState(database, "h-local-api", "local-api");
 
     // biome-ignore lint/suspicious/noExplicitAny: migration accepts the test Kysely instance
     await up097(database.db as any);
 
     const rows = await listRunnerState(database);
     expect(rows.map((r) => r.handle).sort()).toEqual(
-      ["h-cluster", "h-user-desktop"].sort(),
+      ["h-cluster", "h-local-api"].sort(),
     );
     expect(rows.some((r) => r.sandbox_provider_kind === "local-docker")).toBe(
       false,

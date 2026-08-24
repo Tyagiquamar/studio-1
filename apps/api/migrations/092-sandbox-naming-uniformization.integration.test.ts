@@ -3,14 +3,12 @@
  *
  * Covers four rewrites in one migration:
  *  1. `sandbox_runner_state.sandbox_provider_kind` value rewrites
- *     (docker → local-docker, agent-sandbox → cluster, desktop →
- *     user-desktop, plus legacy remote-user → user-desktop).
+ *     (docker → local-docker, agent-sandbox → cluster).
  *  2. `connections.metadata.vmMap` top-level key rename → `sandboxMap`.
  *  3. Inside each `sandboxMap[user][branch]` cell: kind key rewrites
- *     (docker → local-docker, agent-sandbox → cluster, desktop →
- *     user-desktop, remote-user → user-desktop) AND the inner
- *     `sandboxProviderKind` field value; drop legacy `host` / `freestyle`
- *     cells entirely.
+ *     (docker → local-docker, agent-sandbox → cluster) AND the inner
+ *     `sandboxProviderKind` field value; drop legacy `host` / `freestyle` cells
+ *     entirely.
  *  4. Tool-name strings `"VM_START"` / `"VM_DELETE"` anywhere in
  *     `connections.metadata` → `"SANDBOX_START"` / `"SANDBOX_DELETE"`.
  *
@@ -115,8 +113,6 @@ describe("migration 092 — sandbox naming uniformization", () => {
   it("rewrites sandbox_runner_state.sandbox_provider_kind values", async () => {
     await insertRunnerState(database, "h-docker", "docker");
     await insertRunnerState(database, "h-agent-sandbox", "agent-sandbox");
-    await insertRunnerState(database, "h-desktop", "desktop");
-    await insertRunnerState(database, "h-remote-user", "remote-user");
     // Already-canonical row, must not change.
     await insertRunnerState(database, "h-cluster", "cluster");
 
@@ -129,8 +125,6 @@ describe("migration 092 — sandbox naming uniformization", () => {
     );
     expect(byHandle["h-docker"]).toBe("local-docker");
     expect(byHandle["h-agent-sandbox"]).toBe("cluster");
-    expect(byHandle["h-desktop"]).toBe("user-desktop");
-    expect(byHandle["h-remote-user"]).toBe("user-desktop");
     expect(byHandle["h-cluster"]).toBe("cluster");
   });
 
@@ -176,23 +170,11 @@ describe("migration 092 — sandbox naming uniformization", () => {
               sandboxProviderKind: "docker",
               createdAt: 1779000000001,
             },
-            desktop: {
-              vmId: "vm-dt",
-              previewUrl: null,
-              sandboxProviderKind: "desktop",
-              createdAt: 1779000000002,
-            },
             "agent-sandbox": {
               vmId: "vm-as",
               previewUrl: null,
               sandboxProviderKind: "agent-sandbox",
               createdAt: 1779000000003,
-            },
-            "remote-user": {
-              vmId: "vm-ru",
-              previewUrl: null,
-              sandboxProviderKind: "remote-user",
-              createdAt: 1779000000004,
             },
           },
         },
@@ -208,18 +190,13 @@ describe("migration 092 — sandbox naming uniformization", () => {
     const branch = meta.sandboxMap[USER]!["deco/branch-a"]!;
     // Keys are remapped.
     expect(Object.keys(branch).sort()).toEqual(
-      ["cluster", "local-docker", "user-desktop"].sort(),
+      ["cluster", "local-docker"].sort(),
     );
-    // remote-user collapsed onto user-desktop (last writer wins); either entry
-    // body is acceptable, but the field must match the canonical key.
     expect(branch["local-docker"]).toMatchObject({
       sandboxProviderKind: "local-docker",
     });
     expect(branch["cluster"]).toMatchObject({
       sandboxProviderKind: "cluster",
-    });
-    expect(branch["user-desktop"]).toMatchObject({
-      sandboxProviderKind: "user-desktop",
     });
   });
 
@@ -295,15 +272,15 @@ describe("migration 092 — sandbox naming uniformization", () => {
   });
 
   it("is idempotent — re-running on already-migrated rows is a no-op", async () => {
-    await insertRunnerState(database, "h-already", "user-desktop");
+    await insertRunnerState(database, "h-already", "local-api");
     await insertVirtualConnection(database, "vir_idem", {
       sandboxMap: {
         [USER]: {
           "deco/branch-i": {
-            "user-desktop": {
+            "local-api": {
               sandboxHandle: "vm-i",
               previewUrl: null,
-              sandboxProviderKind: "user-desktop",
+              sandboxProviderKind: "local-api",
               createdAt: 1779000000005,
             },
           },

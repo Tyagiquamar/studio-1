@@ -3,8 +3,8 @@
  *
  * `agent-sandbox` is the persisted provider kind for Studio-hosted sandboxes.
  * Earlier storage used the legacy `cluster` spelling. This migration rewrites
- * the persisted discriminants while keeping compatibility parsing in runtime
- * code responsible for any old external inputs.
+ * those persisted discriminants; current runtime readers accept only the
+ * canonical spelling.
  */
 
 import { sql, type Kysely } from "kysely";
@@ -46,8 +46,7 @@ function isValidSandboxRecord(value: unknown): boolean {
   if (
     value.sandboxProviderKind !== undefined &&
     value.sandboxProviderKind !== LEGACY_KIND &&
-    value.sandboxProviderKind !== CANONICAL_KIND &&
-    value.sandboxProviderKind !== "user-desktop"
+    value.sandboxProviderKind !== CANONICAL_KIND
   ) {
     return false;
   }

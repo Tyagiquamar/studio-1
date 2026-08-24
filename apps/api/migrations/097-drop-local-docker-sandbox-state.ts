@@ -4,9 +4,8 @@
  *
  * The Docker sandbox provider has been removed. Any persisted `local-docker`
  * rows/cells are orphaned pointers to containers that no longer exist (and
- * don't survive a studio restart), and the strict readers
- * (`parseBranchMap` / `parseSandboxRecord`) no longer accept the kind — Zod
- * skips/throws on it. Two idempotent steps:
+ * don't survive a studio restart), and the strict branch-map schema no longer
+ * accepts the kind — Zod skips it. Two idempotent steps:
  *
  *  (1) Delete `sandbox_runner_state` rows with
  *      `sandbox_provider_kind = 'local-docker'`.

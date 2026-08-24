@@ -19,6 +19,7 @@ import {
 
 const USER = "user_test";
 const ORG = "org_test";
+const NATIVE_KIND = "local-api";
 
 interface ConnectionRow {
   metadata: string | null;
@@ -164,11 +165,11 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
   it("rewrites table provider kinds up and down", async () => {
     await insertThread(database, "thr_104_cluster", "cluster");
     await insertThread(database, "thr_104_agent_sandbox", "agent-sandbox");
-    await insertThread(database, "thr_104_user_desktop", "user-desktop");
+    await insertThread(database, "thr_104_native", NATIVE_KIND);
     await insertThread(database, "thr_104_null", null);
     await insertRunnerState(database, "h-104-cluster", "cluster");
     await insertRunnerState(database, "h-104-agent-sandbox", "agent-sandbox");
-    await insertRunnerState(database, "h-104-user-desktop", "user-desktop");
+    await insertRunnerState(database, "h-104-native", NATIVE_KIND);
 
     // biome-ignore lint/suspicious/noExplicitAny: migration accepts the test Kysely instance
     await up104(database.db as any);
@@ -176,13 +177,19 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
     expect(await listThreadKinds(database)).toEqual([
       { id: "thr_104_agent_sandbox", sandbox_provider_kind: "agent-sandbox" },
       { id: "thr_104_cluster", sandbox_provider_kind: "agent-sandbox" },
+      {
+        id: "thr_104_native",
+        sandbox_provider_kind: NATIVE_KIND,
+      },
       { id: "thr_104_null", sandbox_provider_kind: null },
-      { id: "thr_104_user_desktop", sandbox_provider_kind: "user-desktop" },
     ]);
     expect(await listRunnerKinds(database)).toEqual([
       { id: "h-104-agent-sandbox", sandbox_provider_kind: "agent-sandbox" },
       { id: "h-104-cluster", sandbox_provider_kind: "agent-sandbox" },
-      { id: "h-104-user-desktop", sandbox_provider_kind: "user-desktop" },
+      {
+        id: "h-104-native",
+        sandbox_provider_kind: NATIVE_KIND,
+      },
     ]);
 
     // biome-ignore lint/suspicious/noExplicitAny: migration accepts the test Kysely instance
@@ -191,13 +198,19 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
     expect(await listThreadKinds(database)).toEqual([
       { id: "thr_104_agent_sandbox", sandbox_provider_kind: "cluster" },
       { id: "thr_104_cluster", sandbox_provider_kind: "cluster" },
+      {
+        id: "thr_104_native",
+        sandbox_provider_kind: NATIVE_KIND,
+      },
       { id: "thr_104_null", sandbox_provider_kind: null },
-      { id: "thr_104_user_desktop", sandbox_provider_kind: "user-desktop" },
     ]);
     expect(await listRunnerKinds(database)).toEqual([
       { id: "h-104-agent-sandbox", sandbox_provider_kind: "cluster" },
       { id: "h-104-cluster", sandbox_provider_kind: "cluster" },
-      { id: "h-104-user-desktop", sandbox_provider_kind: "user-desktop" },
+      {
+        id: "h-104-native",
+        sandbox_provider_kind: NATIVE_KIND,
+      },
     ]);
   });
 
@@ -361,10 +374,10 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
               sandboxProviderKind: "cluster",
               createdAt: 1,
             },
-            "user-desktop": {
-              sandboxHandle: "desktop-handle",
+            [NATIVE_KIND]: {
+              sandboxHandle: "native-handle",
               previewUrl: null,
-              sandboxProviderKind: "user-desktop",
+              sandboxProviderKind: NATIVE_KIND,
               createdAt: 2,
             },
           },
@@ -397,14 +410,14 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
 
     const branchA = meta.sandboxMap[USER]!["deco/branch-a"]!;
     expect(Object.keys(branchA).sort()).toEqual(
-      ["agent-sandbox", "user-desktop"].sort(),
+      ["agent-sandbox", NATIVE_KIND].sort(),
     );
     expect(branchA["agent-sandbox"]).toMatchObject({
       sandboxHandle: "cluster-handle",
       sandboxProviderKind: "agent-sandbox",
     });
-    expect(branchA["user-desktop"]).toMatchObject({
-      sandboxProviderKind: "user-desktop",
+    expect(branchA[NATIVE_KIND]).toMatchObject({
+      sandboxProviderKind: NATIVE_KIND,
     });
 
     const branchB = meta.sandboxMap[USER]!["deco/branch-b"]!;
@@ -431,10 +444,10 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
               sandboxProviderKind: "cluster",
               createdAt: 2,
             },
-            "user-desktop": {
-              sandboxHandle: "desktop",
+            [NATIVE_KIND]: {
+              sandboxHandle: "native",
               previewUrl: null,
-              sandboxProviderKind: "user-desktop",
+              sandboxProviderKind: NATIVE_KIND,
               createdAt: 3,
             },
           },
@@ -452,7 +465,7 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
     };
     const branch = meta.sandboxMap[USER]!["deco/conflict"]!;
     expect(Object.keys(branch).sort()).toEqual(
-      ["agent-sandbox", "user-desktop"].sort(),
+      ["agent-sandbox", NATIVE_KIND].sort(),
     );
     expect(branch["agent-sandbox"]).toMatchObject({
       sandboxHandle: "canonical-agent",
@@ -542,10 +555,10 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
               sandboxProviderKind: "agent-sandbox",
               createdAt: 1,
             },
-            "user-desktop": {
-              sandboxHandle: "desktop-handle",
+            [NATIVE_KIND]: {
+              sandboxHandle: "native-handle",
               previewUrl: null,
-              sandboxProviderKind: "user-desktop",
+              sandboxProviderKind: NATIVE_KIND,
               createdAt: 2,
             },
           },
@@ -560,15 +573,13 @@ describe("migration 104 - agent-sandbox provider kind canonicalization", () => {
       sandboxMap: Record<string, Record<string, Record<string, unknown>>>;
     };
     const branch = meta.sandboxMap[USER]!["deco/down"]!;
-    expect(Object.keys(branch).sort()).toEqual(
-      ["cluster", "user-desktop"].sort(),
-    );
+    expect(Object.keys(branch).sort()).toEqual(["cluster", NATIVE_KIND].sort());
     expect(branch.cluster).toMatchObject({
       sandboxHandle: "agent-handle",
       sandboxProviderKind: "cluster",
     });
-    expect(branch["user-desktop"]).toMatchObject({
-      sandboxProviderKind: "user-desktop",
+    expect(branch[NATIVE_KIND]).toMatchObject({
+      sandboxProviderKind: NATIVE_KIND,
     });
   });
 });

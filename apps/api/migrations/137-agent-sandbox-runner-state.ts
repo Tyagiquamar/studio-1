@@ -1,9 +1,9 @@
 /**
  * Runner-private persistence for shared hosted sandboxes.
  *
- * The existing sandbox_runner_state remains user-scoped for user-desktop and
- * legacy hosted claims. New shared agent-sandbox claims are keyed only by the
- * project ref (which already includes org, virtual MCP, and branch).
+ * The existing sandbox_runner_state remains user-scoped for legacy claims.
+ * New shared agent-sandbox claims are keyed only by the project ref (which
+ * already includes org, virtual MCP, and branch).
  */
 
 import { type Kysely, sql } from "kysely";
