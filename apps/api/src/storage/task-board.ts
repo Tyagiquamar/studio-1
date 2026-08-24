@@ -1860,7 +1860,9 @@ export class TaskBoardStorage {
   }
 
   /** A null actor is a machine path; a `reason` marks a move that meant something
-   *  other than "not done" (Rerun-from-Done stamps `reason: "rerun"`). */
+   *  other than "not done" (Rerun-from-Done stamps `reason: "rerun"`).
+   *  `deployed` counts as leaving Done — with the delivery lanes on, that is
+   *  where a merged PR lands. */
   async hasHumanRejectedDone(
     taskBoardItemId: string,
     organizationId: string,
@@ -1877,7 +1879,7 @@ export class TaskBoardStorage {
       .where("a.task_board_item_id", "=", taskBoardItemId)
       .where("a.action", "=", "status_changed")
       .where(byMember, "is not", null)
-      .where(laneLeft, "=", "done")
+      .where(laneLeft, "in", ["done", "deployed"])
       .where(moveReason, "is", null)
       .limit(1)
       .executeTakeFirst();

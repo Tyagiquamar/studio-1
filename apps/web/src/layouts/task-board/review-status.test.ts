@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { TaskBoardActivity } from "@/hooks/use-task-board-activity";
 import {
   enabledReviewers,
+  laneCanShip,
   reviewsSatisfiedForPromotion,
 } from "./review-status";
 
@@ -87,5 +88,27 @@ describe("reviewsSatisfiedForPromotion", () => {
       IN_REVIEW,
     ];
     expect(reviewsSatisfiedForPromotion(activity, ["qa"])).toBe(false);
+  });
+});
+
+describe("laneCanShip", () => {
+  it("offers the button from the two lanes the server accepts", () => {
+    expect(laneCanShip("in_review")).toBe(true);
+    // The server ships from Approved, so hiding the button there strands the card.
+    expect(laneCanShip("approved")).toBe(true);
+  });
+
+  it("hides it before review and after the ship", () => {
+    for (const lane of [
+      "triage",
+      "todo",
+      "in_progress",
+      "deployed",
+      "post_deploy_validation",
+      "done",
+      "archived",
+    ]) {
+      expect(laneCanShip(lane)).toBe(false);
+    }
   });
 });

@@ -32,3 +32,12 @@ export function reviewsSatisfiedForPromotion(
   if (enabled.length === 0) return true;
   return allReviewersApproved(activity, enabled);
 }
+
+/**
+ * Lanes the "Ship to production" button may act from. Must mirror the server's
+ * `SHIP_ELIGIBLE_LANES`: offering more puts a control on screen that always
+ * errors, offering fewer makes Approved a dead end.
+ */
+export function laneCanShip(status: string): boolean {
+  return status === "in_review" || status === "approved";
+}

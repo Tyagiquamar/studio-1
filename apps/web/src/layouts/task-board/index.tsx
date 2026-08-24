@@ -98,6 +98,8 @@ import {
   isTaskBlocked,
   isTaskHandedToHuman,
   HIDDEN_STATUSES,
+  laneVisibility,
+  moveTargets,
   primaryThread,
   reviewerThreads,
   PRIORITIES,
@@ -117,7 +119,7 @@ import {
   type Member,
 } from "./config";
 import { useTags } from "@/hooks/use-tags";
-import { useSprintConfig } from "@/hooks/use-organization-settings";
+import { useOrgFlag, useSprintConfig } from "@/hooks/use-organization-settings";
 import { sprintOptions } from "@decocms/shared/sprints";
 import { usePreferences } from "@/hooks/use-preferences";
 import {
@@ -1109,6 +1111,7 @@ function SelectionBar({
 }) {
   const t = useT();
   const { data: orgTags = [] } = useTags();
+  const deliveryEnabled = useOrgFlag("delivery_lanes_enabled");
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center">
       <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-background px-3 py-2 card-shadow">
@@ -1131,7 +1134,7 @@ function SelectionBar({
                 {t("taskBoard.taskBoard.moveToButton")}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                {STATUSES.map((status) => (
+                {moveTargets(deliveryEnabled).map((status) => (
                   <DropdownMenuItem
                     key={status}
                     onClick={() => onMoveTo(status)}
@@ -1329,6 +1332,7 @@ function Lanes({
   onRerun?: (item: TaskBoardItem) => void;
   onAssign?: (id: string, userId: string | null) => void;
 }) {
+  const deliveryEnabled = useOrgFlag("delivery_lanes_enabled");
   const [activeId, setActiveId] = useState<string | null>(null);
   // Cards that just landed from a drop — they get the settle animation. Cleared
   // on drag start so dropping the same card twice replays it (a CSS animation
@@ -1417,12 +1421,17 @@ function Lanes({
   const laneItems = (status: TaskBoardItemStatus) =>
     placed.filter((item) => item.status === status).sort(bySortOrder);
 
-  /** Shown-again lanes persist per person (localStorage), so pulling Archived
-   *  onto the board survives a reload. */
-  const hiddenLanes = HIDDEN_STATUSES.filter(
-    (status) => !preferences.shownTaskBoardLanes.includes(status),
-  );
-  const boardLanes = STATUSES.filter((status) => !hiddenLanes.includes(status));
+  /** Shown-again lanes persist per person, so pulling one onto the board
+   *  survives a reload. */
+  const {
+    lanes: boardLanes,
+    hidden: hiddenLanes,
+    hideable: hideableLanes,
+  } = laneVisibility({
+    deliveryEnabled,
+    shownLanes: preferences.shownTaskBoardLanes,
+    occupied: placed.map((item) => item.status),
+  });
   const setLaneShown = (status: TaskBoardItemStatus, shown: boolean) =>
     setPreferences((prev) => ({
       ...prev,
@@ -1594,7 +1603,7 @@ function Lanes({
               onRerun={onRerun}
               onAssign={onAssign}
               onHide={
-                HIDDEN_STATUSES.includes(status)
+                hideableLanes.includes(status)
                   ? () => setLaneShown(status, false)
                   : undefined
               }

@@ -4,8 +4,11 @@ import {
   formatSprintDates,
   insertSortOrder,
   isTaskHandedToHuman,
+  laneVisibility,
+  moveTargets,
   runSortOrders,
   statusIconClassName,
+  STATUSES,
   visibleSprint,
 } from "./config";
 import type { TaskBoardItem } from "./config";
@@ -164,5 +167,93 @@ describe("visibleSprint", () => {
   test("a backlog card has nothing to show either way", () => {
     expect(visibleSprint(null, true)).toBe(null);
     expect(visibleSprint(null, false)).toBe(null);
+  });
+});
+
+describe("moveTargets", () => {
+  test("offers no delivery lane to a board that doesn't run them", () => {
+    expect(moveTargets(false)).toEqual([
+      "triage",
+      "todo",
+      "in_progress",
+      "in_review",
+      "done",
+      "archived",
+    ]);
+  });
+
+  test("offers every lane once they're on", () => {
+    expect(moveTargets(true)).toEqual(STATUSES);
+  });
+});
+
+describe("laneVisibility", () => {
+  const shown: string[] = [];
+
+  test("draws the delivery lanes as columns when they're on", () => {
+    const { lanes, hidden } = laneVisibility({
+      deliveryEnabled: true,
+      shownLanes: shown,
+      occupied: [],
+    });
+    expect(lanes).toEqual([
+      "triage",
+      "todo",
+      "in_progress",
+      "in_review",
+      "approved",
+      "deployed",
+      "post_deploy_validation",
+      "done",
+      // archived is hidden by default
+    ]);
+    expect(hidden).toEqual(["archived"]);
+  });
+
+  test("an empty delivery lane is absent, not hidden, when they're off", () => {
+    const { lanes, hidden } = laneVisibility({
+      deliveryEnabled: false,
+      shownLanes: shown,
+      occupied: [],
+    });
+    expect(lanes).toEqual([
+      "triage",
+      "todo",
+      "in_progress",
+      "in_review",
+      "done",
+    ]);
+    expect(hidden).toEqual(["archived"]);
+  });
+
+  // Lanes off with work still in one: the card must stay reachable.
+  test("a card left in a delivery lane keeps the lane in the drawer", () => {
+    const { lanes, hidden, hideable } = laneVisibility({
+      deliveryEnabled: false,
+      shownLanes: shown,
+      occupied: ["deployed"],
+    });
+    expect(lanes).not.toContain("deployed");
+    expect(hidden).toEqual(["deployed", "archived"]);
+    expect(hideable).toContain("deployed");
+  });
+
+  test("and showing it puts the column back", () => {
+    const { lanes, hidden } = laneVisibility({
+      deliveryEnabled: false,
+      shownLanes: ["deployed"],
+      occupied: ["deployed"],
+    });
+    expect(lanes).toContain("deployed");
+    expect(hidden).toEqual(["archived"]);
+  });
+
+  test("a lane removed from the product can linger in the preference", () => {
+    const { lanes } = laneVisibility({
+      deliveryEnabled: false,
+      shownLanes: ["a_lane_that_no_longer_exists"],
+      occupied: [],
+    });
+    expect(lanes).not.toContain("a_lane_that_no_longer_exists");
   });
 });

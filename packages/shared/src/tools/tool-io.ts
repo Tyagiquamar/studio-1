@@ -127,6 +127,7 @@ export interface StudioToolIO {
             auto_merge?: boolean | undefined;
             cheap_reviewer_model?: boolean | undefined;
             auto_assign_report_tasks_to_super_agent?: boolean | undefined;
+            delivery_lanes_enabled?: boolean | undefined;
           }
         | null
         | undefined;
@@ -199,6 +200,7 @@ export interface StudioToolIO {
             auto_merge?: boolean | undefined;
             cheap_reviewer_model?: boolean | undefined;
             auto_assign_report_tasks_to_super_agent?: boolean | undefined;
+            delivery_lanes_enabled?: boolean | undefined;
           }
         | undefined;
       main_agent_id?: string | null | undefined;
@@ -270,6 +272,7 @@ export interface StudioToolIO {
             auto_merge?: boolean | undefined;
             cheap_reviewer_model?: boolean | undefined;
             auto_assign_report_tasks_to_super_agent?: boolean | undefined;
+            delivery_lanes_enabled?: boolean | undefined;
           }
         | null
         | undefined;
@@ -290,6 +293,9 @@ export interface StudioToolIO {
         | "todo"
         | "in_progress"
         | "in_review"
+        | "approved"
+        | "deployed"
+        | "post_deploy_validation"
         | "archived"
         | undefined;
       priority?: "none" | "low" | "medium" | "high" | "urgent" | undefined;
@@ -312,6 +318,9 @@ export interface StudioToolIO {
           | "todo"
           | "in_progress"
           | "in_review"
+          | "approved"
+          | "deployed"
+          | "post_deploy_validation"
           | "archived";
         priority: "none" | "low" | "medium" | "high" | "urgent";
         assigneeId: string | null;
@@ -370,6 +379,9 @@ export interface StudioToolIO {
           | "todo"
           | "in_progress"
           | "in_review"
+          | "approved"
+          | "deployed"
+          | "post_deploy_validation"
           | "archived";
         priority: "none" | "low" | "medium" | "high" | "urgent";
         assigneeId: string | null;
@@ -426,6 +438,9 @@ export interface StudioToolIO {
         | "todo"
         | "in_progress"
         | "in_review"
+        | "approved"
+        | "deployed"
+        | "post_deploy_validation"
         | "archived"
         | undefined;
       priority?: "none" | "low" | "medium" | "high" | "urgent" | undefined;
@@ -450,6 +465,9 @@ export interface StudioToolIO {
           | "todo"
           | "in_progress"
           | "in_review"
+          | "approved"
+          | "deployed"
+          | "post_deploy_validation"
           | "archived";
         priority: "none" | "low" | "medium" | "high" | "urgent";
         assigneeId: string | null;
@@ -552,6 +570,9 @@ export interface StudioToolIO {
         | "todo"
         | "in_progress"
         | "in_review"
+        | "approved"
+        | "deployed"
+        | "post_deploy_validation"
         | "archived";
       merged: boolean;
     };
@@ -565,6 +586,9 @@ export interface StudioToolIO {
         | "todo"
         | "in_progress"
         | "in_review"
+        | "approved"
+        | "deployed"
+        | "post_deploy_validation"
         | "archived";
       merged: boolean;
     };
@@ -4900,7 +4924,15 @@ export interface StudioToolIO {
         boardName: string | null;
         statusMapping: Record<
           string,
-          "done" | "triage" | "todo" | "in_progress" | "in_review" | "archived"
+          | "done"
+          | "triage"
+          | "todo"
+          | "in_progress"
+          | "in_review"
+          | "approved"
+          | "deployed"
+          | "post_deploy_validation"
+          | "archived"
         >;
         jqlFilter: string | null;
         autoDelegate: boolean;
@@ -4927,6 +4959,9 @@ export interface StudioToolIO {
             | "todo"
             | "in_progress"
             | "in_review"
+            | "approved"
+            | "deployed"
+            | "post_deploy_validation"
             | "archived"
           >
         | undefined;
@@ -4943,7 +4978,15 @@ export interface StudioToolIO {
         boardName: string | null;
         statusMapping: Record<
           string,
-          "done" | "triage" | "todo" | "in_progress" | "in_review" | "archived"
+          | "done"
+          | "triage"
+          | "todo"
+          | "in_progress"
+          | "in_review"
+          | "approved"
+          | "deployed"
+          | "post_deploy_validation"
+          | "archived"
         >;
         jqlFilter: string | null;
         autoDelegate: boolean;

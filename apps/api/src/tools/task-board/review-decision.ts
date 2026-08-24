@@ -9,6 +9,7 @@ import {
   reviewCycleStart,
   reviewCycleVerdicts,
   type ReviewerKind,
+  shippedLane,
 } from "@decocms/shared/task-board";
 import { TaskBoardItemStatusSchema } from "./schema";
 import { recordTaskActivity } from "./activity";
@@ -349,19 +350,20 @@ export const TASK_BOARD_REVIEW_DECISION = defineTool({
       : null;
     const merged = outcome?.merged === true;
 
-    // A merge ships the task → Done.
+    // A merge ships the task → Deployed with the delivery lanes on, else Done.
     if (merged) {
+      const shipped = shippedLane(settings?.flags);
       const done = await ctx.storage.taskBoard.update(
         taskBoardItemId,
         organizationId,
-        { status: "done" },
+        { status: shipped },
         item.updatedBy,
       );
       await recordTaskActivity(ctx, {
         taskBoardItemId,
         action: "status_changed",
         actorId: null,
-        data: { from: item.status, to: "done" },
+        data: { from: item.status, to: shipped },
       });
       emitTaskBoardUpdated(organizationId, done);
       return { status: done.status, merged: true };
