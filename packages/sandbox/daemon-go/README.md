@@ -21,11 +21,13 @@ Studio can tell a live sandbox from a dead one.
 
 ### Dispatch is single-writer per run
 
-One run id, one harness. A dispatch for a run that is already in flight is a
-TAKEOVER: the daemon cancels the run it displaces, waits for that process group
-to die, and only then execs the replacement. Studio sends exactly that when the
-pod driving a run was replaced and another picked the work up, and the invariant
-it buys is that two `claude` processes never share one checkout.
+One run id, one active runner process. The dispatch endpoint always invokes the
+installed Claude Code runner; callers send only the run id and input. A dispatch
+for a run that is already in flight is a TAKEOVER: the daemon cancels the run it
+displaces, waits for that process group to die, and only then execs the
+replacement. Studio sends exactly that when the pod driving a run was replaced
+and another picked the work up, and the invariant it buys is that two `claude`
+processes never share one checkout.
 
 Two properties the consumer depends on, both asserted in `daemon-e2e/`:
 

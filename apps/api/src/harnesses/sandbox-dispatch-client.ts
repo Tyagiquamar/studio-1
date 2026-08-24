@@ -796,22 +796,37 @@ async function* dispatchToDaemon(args: {
   // "operation timed out" with no run, no handle and no duration on it, which is
   // indistinguishable from a model error until you go read pod logs.
   const startedAt = Date.now();
+  const wireInput = toWireInput(args.input);
+  const request = (legacyHarnessId = false) =>
+    args.provider.proxyDaemonRequest(args.handle, "/_sandbox/dispatch", {
+      method: "POST",
+      headers: new Headers({ "content-type": "application/json" }),
+      body: JSON.stringify({
+        ...(legacyHarnessId ? { harnessId: SANDBOX_HOSTED_HARNESS } : {}),
+        runId: args.runId,
+        input: wireInput,
+      }),
+      ...(args.signal ? { signal: args.signal } : {}),
+    });
   let res: Response;
   try {
-    res = await args.provider.proxyDaemonRequest(
-      args.handle,
-      "/_sandbox/dispatch",
-      {
-        method: "POST",
-        headers: new Headers({ "content-type": "application/json" }),
-        body: JSON.stringify({
-          harnessId: SANDBOX_HOSTED_HARNESS,
-          runId: args.runId,
-          input: toWireInput(args.input),
-        }),
-        ...(args.signal ? { signal: args.signal } : {}),
-      },
-    );
+    res = await request();
+    if (res.status === 400) {
+      const errorBody: unknown = await res
+        .clone()
+        .json()
+        .catch(() => null);
+      if (
+        typeof errorBody === "object" &&
+        errorBody !== null &&
+        "error" in errorBody &&
+        errorBody.error === "missing_harness_id"
+      ) {
+        // Old pods can outlive an API rollout; their rejection happens before
+        // the run is claimed, so this compatibility retry is side-effect-free.
+        res = await request(true);
+      }
+    }
   } catch (err) {
     // The proxy could not reach the pod at all (port-forward gone, TLS to a
     // dead node, ECONNRESET). Nothing ran, so this is always safe to continue

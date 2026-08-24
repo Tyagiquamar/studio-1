@@ -19,6 +19,7 @@ import (
 
 const tombstoneTTL = 60 * time.Second
 
+// The dispatch endpoint always runs the sandbox's installed Claude Code runner.
 const sandboxHarnessID = "claude-code"
 
 // maxDispatchBodyBytes stops an unbounded request body from parking the pod's
@@ -301,19 +302,9 @@ func (reg *Registry) HandleDispatch(w http.ResponseWriter, r *http.Request, deps
 		jsonError(w, 400, map[string]string{"error": "bad_json"})
 		return
 	}
-	// Retained as a fixed protocol sentinel because live pods can outlive an API
-	// rollout. This daemon only dispatches sandboxHarnessID.
-	var requestedHarnessID, runId string
-	if raw, ok := frame["harnessId"]; !ok || json.Unmarshal(raw, &requestedHarnessID) != nil {
-		jsonError(w, 400, map[string]string{"error": "missing_harness_id"})
-		return
-	}
+	var runId string
 	if raw, ok := frame["runId"]; !ok || json.Unmarshal(raw, &runId) != nil {
 		jsonError(w, 400, map[string]string{"error": "missing_run_id"})
-		return
-	}
-	if requestedHarnessID != sandboxHarnessID {
-		jsonError(w, 400, map[string]string{"error": "unknown_harness"})
 		return
 	}
 
@@ -380,8 +371,8 @@ func (reg *Registry) runHarness(
 		deps.BeforeRun(runInfoOf(input))
 	}
 	// Deferred, not placed after RunHarness: every terminal path below returns
-	// early (crash, cancel, unknown harness), and the run that crashed halfway is
-	// exactly the one whose stray output must still be rescued.
+	// early (crash, cancel, unavailable runner), and the run that crashed
+	// halfway is exactly the one whose stray output must still be rescued.
 	//
 	// Registered AFTER the keepalive's defer, so it runs BEFORE it: `AfterRun`
 	// copies a skill tree and a session transcript over org-fs, and Studio is

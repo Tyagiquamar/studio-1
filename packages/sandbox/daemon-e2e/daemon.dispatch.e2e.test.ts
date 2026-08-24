@@ -94,7 +94,7 @@ describe("daemon e2e: dispatch", () => {
     const res = await fetch(url(d, "/_sandbox/dispatch"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: toBody({ harnessId: "x", input: {} }),
+      body: toBody({ input: {} }),
     });
     expect(res.status).toBe(401);
   });
@@ -109,39 +109,11 @@ describe("daemon e2e: dispatch", () => {
     expect(((await res.json()) as { error: string }).error).toBe("bad_json");
   });
 
-  it("POST /dispatch with a non-string harnessId → 400 missing_harness_id", async () => {
-    const res = await fetch(url(d, "/_sandbox/dispatch"), {
-      method: "POST",
-      headers: jsonAuthHeaders(),
-      body: toBody({ harnessId: 123, input: {} }),
-    });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toBe(
-      "missing_harness_id",
-    );
-  });
-
-  it("POST /dispatch with another harness → 400 unknown_harness", async () => {
-    const res = await fetch(url(d, "/_sandbox/dispatch"), {
-      method: "POST",
-      headers: jsonAuthHeaders(),
-      body: toBody({
-        harnessId: "codex",
-        runId: "run-other-harness",
-        input: VALID_INPUT,
-      }),
-    });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toBe(
-      "unknown_harness",
-    );
-  });
-
   it("POST /dispatch without runId → 400 missing_run_id", async () => {
     const res = await fetch(url(d, "/_sandbox/dispatch"), {
       method: "POST",
       headers: jsonAuthHeaders(),
-      body: toBody({ harnessId: "claude-code", input: {} }),
+      body: toBody({ input: {} }),
     });
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe(
@@ -155,7 +127,6 @@ describe("daemon e2e: dispatch", () => {
       headers: jsonAuthHeaders(),
       body: toBody({
         runId: "run-bad-input",
-        harnessId: "claude-code",
         input: {},
       }),
     });
@@ -163,7 +134,7 @@ describe("daemon e2e: dispatch", () => {
     expect(((await res.json()) as { error: string }).error).toBe("bad_input");
   });
 
-  it("POST /dispatch with no harness configured → 200 with an error result", async () => {
+  it("POST /dispatch with no runner configured → 200 with an error result", async () => {
     // The gates above answer with a status code; once the envelope is valid the
     // route always answers 200 with a HarnessRunResult, so a run that produced
     // nothing is still `{chunks, error}` and not an HTTP failure.
@@ -171,13 +142,30 @@ describe("daemon e2e: dispatch", () => {
       method: "POST",
       headers: jsonAuthHeaders(),
       body: toBody({
-        runId: "run-no-harness",
-        harnessId: "claude-code",
+        runId: "run-no-runner",
         input: VALID_INPUT,
       }),
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
+    expect(await res.json()).toEqual({
+      chunks: [],
+      done: true,
+      error: { code: "unknown_harness", message: expect.any(String) },
+    });
+  });
+
+  it("accepts the legacy harnessId envelope during a rolling upgrade", async () => {
+    const res = await fetch(url(d, "/_sandbox/dispatch"), {
+      method: "POST",
+      headers: jsonAuthHeaders(),
+      body: toBody({
+        harnessId: "claude-code",
+        runId: "run-legacy-envelope",
+        input: VALID_INPUT,
+      }),
+    });
+    expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       chunks: [],
       done: true,
@@ -240,7 +228,6 @@ describe("daemon e2e: dispatch runs a harness", () => {
       headers: jsonAuthHeaders(),
       body: toBody({
         runId,
-        harnessId: "claude-code",
         input: { ...VALID_INPUT, harness: { stubMode: mode } },
       }),
     });

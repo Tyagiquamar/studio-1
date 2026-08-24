@@ -82,32 +82,6 @@ func TestValidateHarnessInputRejectsEmpty(t *testing.T) {
 	}
 }
 
-func TestHandleDispatchRejectsAnotherHarness(t *testing.T) {
-	const token = "dispatch-token"
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/_sandbox/dispatch",
-		strings.NewReader(`{"harnessId":"codex","runId":"run-1","input":{}}`),
-	)
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec := httptest.NewRecorder()
-
-	NewRegistry().HandleDispatch(rec, req, Deps{DaemonToken: func() string { return token }})
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("unsupported harness returned %d: %s", rec.Code, rec.Body.String())
-	}
-	var result struct {
-		Error string `json:"error"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
-		t.Fatal(err)
-	}
-	if result.Error != "unknown_harness" {
-		t.Fatalf("unexpected error: %q", result.Error)
-	}
-}
-
 func TestValidateHarnessInputAcceptsMinimalFrame(t *testing.T) {
 	input := `{
 		"threadId": "t1",
