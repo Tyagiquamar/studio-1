@@ -5,8 +5,9 @@ metadata:
   name: {{ include "chart-deco-studio.fullname" . }}-ca-cert
   labels:
     {{- include "chart-deco-studio.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
 data:
   ca-cert.pem: |
 {{ .Values.database.caCert | indent 4 }}
 {{- end }}
-

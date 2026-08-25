@@ -105,4 +105,19 @@ spec:
               bun run node_modules/decocms/dist/server/migrate-dbos.js
           resources:
             {{- toYaml $jobResources | nindent 12 }}
+          {{- if and (eq (lower (default "sqlite" .Values.database.engine)) "postgresql") .Values.database.caCert }}
+          volumeMounts:
+            - name: ca-cert
+              mountPath: /etc/ssl/certs
+              readOnly: true
+          {{- end }}
+      {{- if and (eq (lower (default "sqlite" .Values.database.engine)) "postgresql") .Values.database.caCert }}
+      volumes:
+        - name: ca-cert
+          configMap:
+            name: {{ include "chart-deco-studio.fullname" . }}-ca-cert
+            items:
+              - key: ca-cert.pem
+                path: ca-cert.pem
+      {{- end }}
 {{- end }}
