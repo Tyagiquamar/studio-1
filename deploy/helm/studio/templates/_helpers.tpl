@@ -462,9 +462,6 @@ credentials cannot create the database the pods are about to connect to.
 Validates internal NATS cluster-creds mount configuration.
 */}}
 {{- define "chart-deco-studio.validateNatsClusterCreds" -}}
-{{- if hasKey .Values "tunnel" }}
-{{- fail "chart-deco-studio: tunnel.nats was removed; move internal credentials to nats.clusterCreds (the public NATS link tunnel no longer exists)" -}}
-{{- end }}
 {{- with .Values.nats.clusterCreds }}
 {{- if .enabled }}
 {{- if not .secretKey }}

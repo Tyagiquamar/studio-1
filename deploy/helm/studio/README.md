@@ -893,8 +893,9 @@ credentials file, enable `nats.clusterCreds` and provide `NATS_CLUSTER_CREDS`
 through the chart-managed Secret, `secret.secretName`, or `externalSecret`:
 
 > Breaking values change: `tunnel.nats` has been removed. Move an existing
-> `tunnel.nats.clusterCreds` block to `nats.clusterCreds`. The chart rejects
-> the retired path so credentials cannot be silently ignored.
+> `tunnel.nats.clusterCreds` block to `nats.clusterCreds`. Retired
+> `tunnel.nats` values are ignored and no longer expose a public NATS link
+> tunnel.
 
 ```yaml
 nats:
